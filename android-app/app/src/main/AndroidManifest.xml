@@ -1,0 +1,47 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.guardianai">
+
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
+    <!-- Optional telephony feature: required=false because SMS/Call are optional features in the app -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission 
+        android:name="android.permission.CALL_PHONE"
+        android:description="@string/emergency_calls_sms_description" />
+    <uses-permission 
+        android:name="android.permission.SEND_SMS" 
+        tools:remove="android:maxSdkVersion"
+        android:description="@string/emergency_calls_sms_description" />
+
+    <!-- Using a system drawable as a temporary placeholder for launcher icon during development.
+         Replace with your app icon files under res/mipmap/ when ready. -->
+    <application
+        android:label="@string/app_name"
+        android:icon="@android:drawable/ic_dialog_alert"
+        android:roundIcon="@android:drawable/ic_dialog_alert">
+
+        <!-- Fall detection service that monitors device sensors and location -->
+        <service
+            android:name="com.guardianai.service.FallDetectionService"
+            android:exported="false"
+            android:description="@string/fall_detection_service_description"
+            android:foregroundServiceType="location|connectedDevice">
+        </service>
+
+        <activity android:name="com.guardianai.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

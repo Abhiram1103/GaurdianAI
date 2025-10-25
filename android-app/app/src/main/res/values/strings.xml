@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">GuardianAI</string>
+    <string name="fall_detection_service_description">This service monitors device sensors to detect falls and can alert emergency contacts with your location if a fall is detected.</string>
+    <string name="emergency_calls_sms_description">Emergency contact features are used only for sending automatic alerts when a fall is detected, helping ensure user safety in emergency situations.</string>
+</resources>
