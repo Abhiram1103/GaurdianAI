@@ -6,15 +6,16 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.guardianai.service.FallDetectionService
 import com.guardianai.ui.screens.HomeScreen
 import com.guardianai.ui.screens.PermissionsScreen
 import com.guardianai.ui.screens.SplashScreen
@@ -22,6 +23,29 @@ import com.guardianai.ui.screens.ContactsScreen
 import com.guardianai.ui.theme.GuardianAITheme
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val allPermissionsGranted = permissions.entries.all { it.value }
+            if (allPermissionsGranted) {
+                startFallDetectionService()
+            } else {
+                Toast.makeText(this, "Permissions are required for the app to function.", Toast.LENGTH_LONG).show()
+            }
+        }
+
+    // --- UPDATED PERMISSIONS LIST ---
+    // CALL_PHONE permission is removed from this list
+    private val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(
+            Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.SEND_SMS
+        )
+    } else {
+        arrayOf(
+            Manifest.permission.SEND_SMS
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,53 +57,21 @@ class MainActivity : ComponentActivity() {
             GuardianAITheme(darkTheme = darkMode) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val firstLaunch = prefs.getBoolean("first_launch_done", false)
-
-                    // simple navigation state
                     var currentScreen by remember { mutableStateOf(if (!firstLaunch) Screen.Permissions else Screen.Home) }
 
                     when (currentScreen) {
                         Screen.Splash -> SplashScreen(onContinue = { currentScreen = Screen.Permissions })
                         Screen.Permissions -> PermissionsScreen(
                             onPermissionsGranted = {
-                                // ensure required runtime permissions are present before starting service
-                                val postNotificationsOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                } else true
-
-                                if (!postNotificationsOk) {
-                                    android.widget.Toast.makeText(this, "Please enable notifications to allow background monitoring.", android.widget.Toast.LENGTH_LONG).show()
-                                    // stay on the Permissions screen so the user can enable it
-                                    currentScreen = Screen.Permissions
-                                } else {
-                                    prefs.edit().putBoolean("first_launch_done", true).apply()
-                                    // start background (foreground) service scaffold
-                                    try {
-                                        // use ContextCompat to start foreground service for compatibility
-                                        androidx.core.content.ContextCompat.startForegroundService(
-                                            this,
-                                            Intent(this, com.guardianai.service.FallDetectionService::class.java)
-                                        )
-                                    } catch (t: Throwable) {
-                                        // prevent the app from crashing if starting the service fails
-                                        android.widget.Toast.makeText(this, "Could not start background service: ${t.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
-                                    }
-                                    currentScreen = Screen.Home
-                                }
-                            },
-                            onBack = {
-                                // allow the user to back out to Home without finishing permissions
+                                requestPermissions()
+                                prefs.edit().putBoolean("first_launch_done", true).apply()
                                 currentScreen = Screen.Home
-                            }
+                            },
+                            onBack = { currentScreen = Screen.Home }
                         )
                         Screen.Home -> HomeScreen(
-                            onOpenPermissions = {
-                                android.util.Log.d("GuardianAI", "Navigation: Home -> Permissions")
-                                currentScreen = Screen.Permissions
-                            },
-                            onOpenContacts = {
-                                android.util.Log.d("GuardianAI", "Navigation: Home -> Contacts")
-                                currentScreen = Screen.Contacts
-                            },
+                            onOpenPermissions = { currentScreen = Screen.Permissions },
+                            onOpenContacts = { currentScreen = Screen.Contacts },
                             darkMode = darkMode,
                             onToggleDarkMode = { enabled ->
                                 darkMode = enabled
@@ -87,14 +79,32 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                         Screen.Contacts -> ContactsScreen(
-                            onDone = { 
-                                android.util.Log.d("GuardianAI", "Navigation: Contacts -> Home")
-                                currentScreen = Screen.Home 
-                            }
+                            onDone = { currentScreen = Screen.Home }
                         )
                     }
                 }
             }
+        }
+    }
+
+    private fun requestPermissions() {
+        val allPermissionsGranted = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+        if (allPermissionsGranted) {
+            startFallDetectionService()
+        } else {
+            requestPermissionsLauncher.launch(requiredPermissions)
+        }
+    }
+
+    private fun startFallDetectionService() {
+        try {
+            val serviceIntent = Intent(this, FallDetectionService::class.java)
+            ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (t: Throwable) {
+            Toast.makeText(this, "Could not start background service: ${t.localizedMessage}", Toast.LENGTH_LONG).show()
         }
     }
 }
